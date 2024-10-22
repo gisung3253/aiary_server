@@ -5,6 +5,17 @@ dotenv.config();
 const openAiApiKey = process.env.OPENAI_API_KEY;
 const replicateApiToken = process.env.REPLICATE_API_TOKEN;
 
+// 고정된 프롬프트와 생성된 프롬프트를 결합하는 함수
+function combinePrompts(staticText, generatedPrompt) {
+  if (generatedPrompt.length <= 200) {
+    // 생성된 프롬프트가 50자 이하일 경우, 고정 프롬프트를 뒤에 추가
+    return generatedPrompt + " " + staticText;
+  } else {
+    // 생성된 프롬프트가 50자 이상일 경우, 고정 프롬프트를 앞에 추가
+    return staticText + generatedPrompt;
+  }
+}
+
 // GPT-3.5 API를 사용해 입력 텍스트를 프롬프트로 변환
 async function generatePromptFromGPT(contents) {
   try {
@@ -17,8 +28,8 @@ async function generatePromptFromGPT(contents) {
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
         messages: [
-          { role: 'system', content: 'You are a helpful assistant that generates prompts for image generation, vintage cartoon style.' },
-          { role: 'user', content: `Generate a prompt for an image based on the following description: ${contents}` }
+          { role: 'system', content: 'You are a helpful assistant that translates Korean descriptions into short English image prompts. Focus on extracting the most important features or elements from the content to generate a concise prompt.' },
+          { role: 'user', content: `Extract the key elements from the following Korean description and generate a short, concise image prompt in English: ${contents}` }
         ],
         max_tokens: 100,
         temperature: 0.7
@@ -32,11 +43,12 @@ async function generatePromptFromGPT(contents) {
     const data = await response.json();
     const gptPrompt = data.choices[0].message.content.trim();
 
-    // 미리 제공된 문구를 포함한 최종 프롬프트 생성
-    const staticText = `Trigger: vintage cartoon\nA vintage, noir-inspired cartoon scene that evokes the elegance and mystery of mid-20th century aesthetics. The characters are stylishly dressed in glamorous evening wear, from tailored suits to sleek black dresses, and are depicted in luxurious settings like dimly lit bars, cobblestone streets, and sophisticated cafés. The overall tone is monochromatic or sepia, with dramatic lighting and deep shadows, enhancing the mood of intrigue and class. The scenes capture moments of quiet solitude or subtle interactions, often with a hint of mystery, reminiscent of classic film noir. Architectural elements include European-style streets, high-end urban offices with views of iconic city skylines, and cozy yet opulent interiors. The illustrations exude a sense of timeless elegance, with expressive character designs and a rich atmosphere that feels both nostalgic and cinematic.\n\n`;
+    // 고정된 프롬프트
+    const staticText = `Trigger: vintage cartoon\nAlways portraying young men or young women\n
+A noir-inspired vintage cartoon scene with stylish characters in evening wear, set in dimly lit bars, cobblestone streets, or cafés. Monochromatic or sepia tones with dramatic lighting create a sense of mystery and elegance, featuring subtle interactions in European-style streets or cozy interiors.\n\n`;
 
-    // GPT 프롬프트와 미리 정의된 문구 결합
-    return staticText + gptPrompt;
+    // 고정된 프롬프트와 GPT 생성된 프롬프트 결합
+    return combinePrompts(staticText, gptPrompt);
   } catch (error) {
     console.error('Error generating prompt from GPT-3.5:', error);
     throw error;
@@ -104,16 +116,23 @@ async function generateImageWithReplicate(prompt) {
   }
 }
 
+// 전체 프로세스 실행
 async function generateImageModel1(contents) {
-  const prompt = await generatePromptFromGPT(contents);
+  try {
+    // GPT-3.5 API를 사용해 프롬프트 생성
+    const prompt = await generatePromptFromGPT(contents);
     console.log('Generated Prompt:', prompt);
 
     // Replicate를 사용해 이미지 생성
     const imageUrl = await generateImageWithReplicate(prompt);
-    console.log('Generated Image URL:', imageUrl);
 
     // 이미지 URL 반환
     return imageUrl;
+  } catch (error) {
+    console.error('Error generating image model:', error);
+    throw error;
+  }
 }
+
 
 export default generateImageModel1;

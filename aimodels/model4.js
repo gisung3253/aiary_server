@@ -5,6 +5,17 @@ dotenv.config();
 const openAiApiKey = process.env.OPENAI_API_KEY;
 const replicateApiToken = process.env.REPLICATE_API_TOKEN;
 
+// 고정된 프롬프트와 생성된 프롬프트를 결합하는 함수
+function combinePrompts(staticText, generatedPrompt) {
+  if (generatedPrompt.length <= 200) {
+    // 생성된 프롬프트가 50자 이하일 경우, 고정 프롬프트를 뒤에 추가
+    return generatedPrompt + " " + staticText;
+  } else {
+    // 생성된 프롬프트가 50자 이상일 경우, 고정 프롬프트를 앞에 추가
+    return staticText + generatedPrompt;
+  }
+}
+
 // GPT-3.5 API를 사용해 입력 텍스트를 프롬프트로 변환
 async function generatePromptFromGPT(contents) {
   try {
@@ -17,8 +28,8 @@ async function generatePromptFromGPT(contents) {
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
         messages: [
-          { role: 'system', content: 'You are a helpful assistant that generates prompts for image generation, watercolor style.' },
-          { role: 'user', content: `Generate a prompt for an image based on the following description: ${contents}` }
+          { role: 'system', content: 'You are a helpful assistant that translates Korean descriptions into very short, concise English image prompts. Extract only the most essential and distinctive features, keeping the prompt as brief as possible.' },
+          { role: 'user', content: `Extract the most essential and distinctive features from the following Korean description and generate a very short image prompt in English: ${contents}` }
         ],
         max_tokens: 100,
         temperature: 0.7
@@ -32,12 +43,11 @@ async function generatePromptFromGPT(contents) {
     const data = await response.json();
     const gptPrompt = data.choices[0].message.content.trim();
 
-    // 미리 제공된 문구를 포함한 최종 프롬프트 생성
-    const staticText = `Trigger: watercolor
-The images display a dreamy, vibrant watercolor style, characterized by soft, flowing hues that blend seamlessly into one another. The scenes evoke a sense of tranquility and wonder, often featuring nature landscapes like serene rivers, majestic mountains, and expansive fields. The skies are painted in vivid gradients of pink, orange, and blue, sometimes accompanied by a radiant sun or glowing celestial elements. Children and families are central figures in many of the scenes, exploring, playing, or gazing in awe at the beauty surrounding them. Trees, animals, and flowers are gently detailed, adding to the harmonious, peaceful atmosphere. The use of light and shadow creates an ethereal quality, where the boundaries between reality and imagination blur, bringing a sense of innocence and adventure to each painting. This watercolor style captures both the simplicity of childhood and the awe of the natural world with a delicate touch of fantasy and optimism.\n\n`;
+    // 고정된 프롬프트
+    const staticText = `Trigger: watercolor \nAlways portraying young men or young women\nThe images display a dreamy, vibrant watercolor style, with soft, flowing hues that blend seamlessly into one another. The scenes evoke tranquility and wonder, often featuring serene natural landscapes such as calm rivers, majestic mountains, and expansive fields. The human figures should be painted in the same soft, fluid watercolor style as the background, with gentle brushstrokes and colors that blend harmoniously into the environment.\n\n`;
 
-    // GPT 프롬프트와 미리 정의된 문구 결합
-    return staticText + gptPrompt;
+    // 고정된 프롬프트와 GPT 생성된 프롬프트 결합
+    return combinePrompts(staticText, gptPrompt);
   } catch (error) {
     console.error('Error generating prompt from GPT-3.5:', error);
     throw error;
@@ -105,16 +115,23 @@ async function generateImageWithReplicate(prompt) {
   }
 }
 
+// 전체 프로세스 실행
 async function generateImageModel4(contents) {
-  const prompt = await generatePromptFromGPT(contents);
+  try {
+    // GPT-3.5 API를 사용해 프롬프트 생성
+    const prompt = await generatePromptFromGPT(contents);
     console.log('Generated Prompt:', prompt);
 
     // Replicate를 사용해 이미지 생성
     const imageUrl = await generateImageWithReplicate(prompt);
-    console.log('Generated Image URL:', imageUrl);
 
     // 이미지 URL 반환
     return imageUrl;
+  } catch (error) {
+    console.error('Error generating image model:', error);
+    throw error;
+  }
 }
+
 
 export default generateImageModel4;

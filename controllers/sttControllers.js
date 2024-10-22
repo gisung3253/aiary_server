@@ -1,6 +1,6 @@
 import multer from 'multer';
 import speech from '@google-cloud/speech';
-import credentials from './aiary-438716-366ed07002e5.json' assert { type: "json" };
+import credentials from './key.json' assert { type: "json" };
 
 
 const upload = multer();
